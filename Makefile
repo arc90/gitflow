@@ -41,6 +41,7 @@ EXEC_FILES=git-flow
 SCRIPT_FILES =git-flow-init
 SCRIPT_FILES+=git-flow-feature
 SCRIPT_FILES+=git-flow-hotfix
+SCRIPT_FILES+=git-flow-untethered
 SCRIPT_FILES+=git-flow-release
 SCRIPT_FILES+=git-flow-support
 SCRIPT_FILES+=git-flow-version
