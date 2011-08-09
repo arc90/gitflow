@@ -1,6 +1,8 @@
 0.4.2:
 -----
-Release date: **not yet**
+Arc90 Specific - Support for git flow untethered
+
+Additional features from the interim release we branched from:
 
 * `git flow feature finish` can now be called without a feature branch
   name(prefix) argument and will finish the current branch, if on any.

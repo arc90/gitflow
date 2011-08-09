@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 require 'formula'
 
 class GitFlowCompletion < Formula
@@ -18,8 +17,8 @@ class GitFlowCompletion < Formula
 end
 
 class GitFlow < Formula
-  url 'https://github.com/arc90/gitflow.git', :tag => '0.4.1'
-  version '0.4.1'
+  url 'https://github.com/arc90/gitflow.git', :tag => '0.4.2'
+  version '0.4.2'
   head 'https://github.com/arc90/gitflow.git', :branch => 'develop'
 
   homepage 'https://github.com/arc90/gitflow'
