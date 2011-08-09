@@ -44,7 +44,7 @@ PREFIX=$(git config --get gitflow.prefix.feature)
 usage() {
 	echo "usage: git flow feature [list] [-v]"
 	echo "       git flow feature start [-F] <name> [<base>]"
-	echo "       git flow feature finish [-rFk] <name|nameprefix>"
+	echo "       git flow feature finish [-rFk] [<name|nameprefix>]"
 	echo "       git flow feature publish <name>"
 	echo "       git flow feature track <name>"
 	echo "       git flow feature diff [<name|nameprefix>]"
@@ -232,7 +232,7 @@ cmd_finish() {
 	DEFINE_boolean rebase false "rebase instead of merge" r
 	DEFINE_boolean keep false "keep branch after performing finish" k
 	parse_args "$@"
-	expand_nameprefix_arg
+	expand_nameprefix_arg_or_current
 
 	# sanity checks
 	require_branch "$BRANCH"
@@ -281,16 +281,17 @@ cmd_finish() {
 	require_clean_working_tree
 
 	# update local repo with remote changes first, if asked
-	if has "$ORIGIN/$BRANCH" "$(git_remote_branches)"; then
+	if has "$ORIGIN/$BRANCH" $(git_remote_branches); then
 		if flag fetch; then
 			git fetch -q "$ORIGIN" "$BRANCH"
+			git fetch -q "$ORIGIN" "$DEVELOP_BRANCH"
 		fi
 	fi
 
-	if has "$ORIGIN/$BRANCH" "$(git_remote_branches)"; then
+	if has "$ORIGIN/$BRANCH" $(git_remote_branches); then
 		require_branches_equal "$BRANCH" "$ORIGIN/$BRANCH"
 	fi
-	if has "$ORIGIN/$DEVELOP_BRANCH" "$(git_remote_branches)"; then
+	if has "$ORIGIN/$DEVELOP_BRANCH" $(git_remote_branches); then
 		require_branches_equal "$DEVELOP_BRANCH" "$ORIGIN/$DEVELOP_BRANCH"
 	fi
 

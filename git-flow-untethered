@@ -40,14 +40,12 @@ require_git_repo
 require_gitflow_initialized
 gitflow_load_settings
 VERSION_PREFIX=$(eval "echo `git config --get gitflow.prefix.versiontag`")
-PREFIX=$(git config --get gitflow.prefix.release)
+PREFIX=$(git config --get gitflow.prefix.untethered)
 
 usage() {
-	echo "usage: git flow release [list] [-v]"
-	echo "       git flow release start [-F] <version> [<base>]"
-	echo "       git flow release finish [-Fsumpk] <version>"
-	echo "       git flow release publish <name>"
-	echo "       git flow release track <name>"
+	echo "usage: git flow untethered [list] [-v]"
+	echo "       git flow untethered start [-F] <version> [<base>]"
+	echo "       git flow untethered finish [-Fsumpk] <version>"
 }
 
 cmd_default() {
@@ -58,22 +56,21 @@ cmd_list() {
 	DEFINE_boolean verbose false 'verbose (more) output' v
 	parse_args "$@"
 
-	local release_branches
+	local untethered_branches
 	local current_branch
 	local short_names
-	release_branches=$(echo "$(git_local_branches)" | grep "^$PREFIX")
-	if [ -z "$release_branches" ]; then
-		warn "No release branches exist."
+	untethered_branches=$(echo "$(git_local_branches)" | grep "^$PREFIX")
+	if [ -z "$untethered_branches" ]; then
+		warn "No untethered branches exist."
                 warn ""
-                warn "You can start a new release branch:"
+                warn "You can start a new untethered branch:"
                 warn ""
-                warn "    git flow release start <name> [<base>]"
+                warn "    git flow untethered start <version> [<base>]"
                 warn ""
 		exit 0
 	fi
-
 	current_branch=$(git branch --no-color | grep '^\* ' | grep -v 'no branch' | sed 's/^* //g')
-	short_names=$(echo "$release_branches" | sed "s ^$PREFIX  g")
+	short_names=$(echo "$untethered_branches" | sed "s ^$PREFIX  g")
 
 	# determine column width first
 	local width=0
@@ -87,8 +84,8 @@ cmd_list() {
 	local branch
 	for branch in $short_names; do
 		local fullname=$PREFIX$branch
-		local base=$(git merge-base "$fullname" "$DEVELOP_BRANCH")
-		local develop_sha=$(git rev-parse "$DEVELOP_BRANCH")
+		local base=$(git merge-base "$fullname" "$MASTER_BRANCH")
+		local master_sha=$(git rev-parse "$MASTER_BRANCH")
 		local branch_sha=$(git rev-parse "$fullname")
 		if [ "$fullname" = "$current_branch" ]; then
 			printf "* "
@@ -97,10 +94,16 @@ cmd_list() {
 		fi
 		if flag verbose; then
 			printf "%-${width}s" "$branch"
-			if [ "$branch_sha" = "$develop_sha" ]; then
+			if [ "$branch_sha" = "$master_sha" ]; then
 				printf "(no commits yet)"
 			else
-				local nicename=$(git rev-parse --short "$base")
+				local tagname=$(git name-rev --tags --no-undefined --name-only "$base")
+				local nicename
+				if [ "$tagname" != "" ]; then
+					nicename=$tagname
+				else
+					nicename=$(git rev-parse --short "$base")
+				fi
 				printf "(based on $nicename)"
 			fi
 		else
@@ -133,39 +136,39 @@ require_version_arg() {
 	fi
 }
 
-require_base_is_on_develop() {
+require_base_is_on_master() {
 	if ! git branch --no-color --contains "$BASE" 2>/dev/null \
 			| sed 's/[* ] //g' \
-	  		| grep -q "^$DEVELOP_BRANCH\$"; then
-		die "fatal: Given base '$BASE' is not a valid commit on '$DEVELOP_BRANCH'."
+	  		| grep -q "^$MASTER_BRANCH\$"; then
+		die "fatal: Given base '$BASE' is not a valid commit on '$MASTER_BRANCH'."
 	fi
 }
 
-require_no_existing_release_branches() {
-	local release_branches=$(echo "$(git_local_branches)" | grep "^$PREFIX")
-	local first_branch=$(echo ${release_branches} | head -n1)
+require_no_existing_untethered_branches() {
+	local untethered_branches=$(echo "$(git_local_branches)" | grep "^$PREFIX")
+	local first_branch=$(echo ${untethered_branches} | head -n1)
 	first_branch=${first_branch#$PREFIX}
-	[ -z "$release_branches" ] || \
-		die "There is an existing release branch ($first_branch). Finish that one first."
+	[ -z "$untethered_branches" ] || \
+		die "There is an existing untethered branch ($first_branch). Finish that one first."
 }
 
 cmd_start() {
 	DEFINE_boolean fetch false "fetch from $ORIGIN before performing finish" F
 	parse_args "$@"
-	BASE=${2:-$DEVELOP_BRANCH}
+	BASE=${2:-$MASTER_BRANCH}
 	require_version_arg
-	require_base_is_on_develop
-	require_no_existing_release_branches
+	require_base_is_on_master
+	require_no_existing_untethered_branches
 
 	# sanity checks
 	require_clean_working_tree
 	require_branch_absent "$BRANCH"
 	require_tag_absent "$VERSION_PREFIX$VERSION"
 	if flag fetch; then
-		git fetch -q "$ORIGIN" "$DEVELOP_BRANCH"
+		git fetch -q "$ORIGIN" "$MASTER_BRANCH"
 	fi
-	if has "$ORIGIN/$DEVELOP_BRANCH" $(git_remote_branches); then
-		require_branches_equal "$DEVELOP_BRANCH" "$ORIGIN/$DEVELOP_BRANCH"
+	if has "$ORIGIN/$MASTER_BRANCH" $(git_remote_branches); then
+		require_branches_equal "$MASTER_BRANCH" "$ORIGIN/$MASTER_BRANCH"
 	fi
 
 	# create branch
@@ -178,10 +181,10 @@ cmd_start() {
 	echo
 	echo "Follow-up actions:"
 	echo "- Bump the version number now!"
-	echo "- Start committing last-minute fixes in preparing your release"
+	echo "- Start committing your hot fixes"
 	echo "- When done, run:"
 	echo
-	echo "     git flow release finish '$VERSION'"
+	echo "     git flow untethered finish '$VERSION'"
 	echo
 }
 
@@ -193,7 +196,6 @@ cmd_finish() {
 	DEFINE_boolean push false "push to $ORIGIN after performing finish" p
 	DEFINE_boolean keep false "keep branch after performing finish" k
 	DEFINE_boolean notag false "don't tag this release" n
-
 	parse_args "$@"
 	require_version_arg
 
@@ -239,7 +241,7 @@ cmd_finish() {
 			flag sign && opts="$opts -s"
 			[ "$FLAGS_signingkey" != "" ] && opts="$opts -u '$FLAGS_signingkey'"
 			[ "$FLAGS_message" != "" ] && opts="$opts -m '$FLAGS_message'"
-			git tag $opts "$tagname" || \
+			git tag $opts "$VERSION_PREFIX$VERSION" || \
 			die "Tagging failed. Please run finish again to retry."
 		fi
 	fi
@@ -260,9 +262,6 @@ cmd_finish() {
 
 	# delete branch
 	if noflag keep; then
-		if [ "$BRANCH" = "$(git_current_branch)" ]; then
-			git checkout "$MASTER_BRANCH"
-		fi
 		git branch -d "$BRANCH"
 	fi
 
@@ -273,75 +272,25 @@ cmd_finish() {
 			die "Could not push to $MASTER_BRANCH from $ORIGIN."
 		if noflag notag; then
 			git push --tags "$ORIGIN" || \
-			  die "Could not push tags to $ORIGIN."
+				die "Could not push tags to $ORIGIN."
 		fi
-		git push "$ORIGIN" :"$BRANCH" || \
-			die "Could not delete the remote $BRANCH in $ORIGIN."
 	fi
 
 	echo
 	echo "Summary of actions:"
 	echo "- Latest objects have been fetched from '$ORIGIN'"
-	echo "- Release branch has been merged into '$MASTER_BRANCH'"
+	echo "- Untethered branch has been merged into '$MASTER_BRANCH'"
 	if noflag notag; then
-		echo "- The release was tagged '$tagname'"
+		echo "- The untethered was tagged '$VERSION_PREFIX$VERSION'"
 	fi
-	echo "- Release branch has been back-merged into '$DEVELOP_BRANCH'"
+	echo "- Untethered branch has been back-merged into '$DEVELOP_BRANCH'"
 	if flag keep; then
-		echo "- Release branch '$BRANCH' is still available"
+		echo "- Untethered branch '$BRANCH' is still available"
 	else
-		echo "- Release branch '$BRANCH' has been deleted"
+		echo "- Untethered branch '$BRANCH' has been deleted"
 	fi
 	if flag push; then
 		echo "- '$DEVELOP_BRANCH', '$MASTER_BRANCH' and tags have been pushed to '$ORIGIN'"
-		echo "- Release branch '$BRANCH' in '$ORIGIN' has been deleted."
 	fi
-	echo
-}
-
-cmd_publish() {
-	parse_args "$@"
-	require_version_arg
-
-	# sanity checks
-	require_clean_working_tree
-	require_branch "$BRANCH"
-	git fetch -q "$ORIGIN"
-	require_branch_absent "$ORIGIN/$BRANCH"
-
-	# create remote branch
-	git push "$ORIGIN" "$BRANCH:refs/heads/$BRANCH"
-	git fetch -q "$ORIGIN"
-
-	# configure remote tracking
-	git config "branch.$BRANCH.remote" "$ORIGIN"
-	git config "branch.$BRANCH.merge" "refs/heads/$BRANCH"
-	git checkout "$BRANCH"
-
-	echo
-	echo "Summary of actions:"
-	echo "- A new remote branch '$BRANCH' was created"
-	echo "- The local branch '$BRANCH' was configured to track the remote branch"
-	echo "- You are now on branch '$BRANCH'"
-	echo
-}
-
-cmd_track() {
-	parse_args "$@"
-	require_version_arg
-
-	# sanity checks
-	require_clean_working_tree
-	require_branch_absent "$BRANCH"
-	git fetch -q "$ORIGIN"
-	require_branch "$ORIGIN/$BRANCH"
-
-	# create tracking branch
-	git checkout -b "$BRANCH" "$ORIGIN/$BRANCH"
-
-	echo
-	echo "Summary of actions:"
-	echo "- A new remote tracking branch '$BRANCH' was created"
-	echo "- You are now on branch '$BRANCH'"
 	echo
 }

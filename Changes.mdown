@@ -1,3 +1,16 @@
+0.4.2:
+-----
+Arc90 Specific - Support for git flow untethered
+
+Additional features from the interim release we branched from:
+
+* `git flow feature finish` can now be called without a feature branch
+  name(prefix) argument and will finish the current branch, if on any.
+
+* Various minor bug fixes related to internal argument passing
+
+* Add package installers for the Debian and Windows platforms.
+
 0.4.1:
 -----
 Release date: **2011/02/04**
